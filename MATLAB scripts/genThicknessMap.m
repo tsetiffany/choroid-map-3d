@@ -1,4 +1,4 @@
-filepath = 'I:\1. Reg_Manuscript\MJ_20250618_FOV_reg\LFOV\Seg';
+filepath = 'I:\2. CVI\15May25_MJ_OD\Seg';
 
 % Compute thickness at each A-scan (en face location)
 thickness_map = segCS_corrected(51:end-50,51:end-50) - segRPE_corrected(51:end-50,51:end-50);

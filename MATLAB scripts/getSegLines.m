@@ -202,7 +202,7 @@ function [segRPE, segCS] = getSegLines(averaged_dopu,savepath)
 %         end
 %     end
 %     
-%     for i=1:600
+%     for i=1:500
 %         imadjusted_vol(:,:,i) = imadjust(mat2gray(averaged_oct(:,:,i)));
 %     end
 %     

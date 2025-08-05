@@ -1,11 +1,39 @@
 %% Parameters
 
-output_filepath = 'I:\1. Reg_Manuscript\MJ_20250618_FOV_reg\LFOV\Seg';
-seg_path = "I:\1. Reg_Manuscript\MJ_20250618_FOV_reg\LFOV\Seg\MJ_0618_seg_export_corr.nii.gz";
+output_filepath = 'I:\2. CVI\15May25_MJ_OD\Seg';
+seg_path = "I:\2. CVI\15May25_MJ_OD\Seg\seg_export_corr.nii";
 % train_filepath = 'H:\CVI Training Data Set';
 
 [depth, numAscans, numBscans] = size(averaged_dopu); 
 [segRPE, segCS] = getSegLines(averaged_dopu, output_filepath);
+
+% Visualize seg lines
+segRPEvol = zeros(depth, numAscans, numBscans);
+segCSvol = zeros(depth, numAscans, numBscans);
+
+segRPE(segRPE<1) = 1; % fix interpolation outside of [1 depth]
+segCS(segCS>depth) = depth;
+
+for i = 1:numBscans
+    for j = 1:numAscans
+        rowRPE = round(segRPE(j,i));  % Get the row index of the seg line
+        rowCS = round(segCS(j,i));
+        if rowRPE >= 1 && rowRPE <= depth
+            segRPEvol(rowRPE,j,i) = 1;  % Set that point to 1 in the 3D mask
+        end
+        if rowCS >= 1 && rowCS <= depth
+            segCSvol(rowCS,j,i) = 1;  % Set that point to 1 in the 3D mask
+        end
+    end
+end
+ 
+for i=50:numBscans-49
+    overlay = imfuse(averaged_dopu(:,25:end-25,i),segRPEvol(:,25:end-25,i));
+    overlay2 = imfuse(overlay,segCSvol(:,25:end-25,i));
+    imshow(overlay2)
+    title(i)
+    pause(0.01)
+end
 
 for i=1:numBscans
     imshow(imadjust(mat2gray(averaged_dopu(:,:,i))))
@@ -38,6 +66,7 @@ for i=1:numBscans
 end
 %% Optimally Oriented Flux (OOF)
 
+% LFOV
 tic
 % Large vessel setting
 radii = 5:5:40;
@@ -52,6 +81,21 @@ dopu_OOF = oof3response(dopu_flattened, radii, opts);
 
 figure; imshow(imadjust(mat2gray(dopu_OOF(:,51:end-50,200))));
 figure; imshow(imadjust(mat2gray(squeeze(mean(dopu_OOF(:,51:end-50,51:end-50))))))
+
+% UWFOV  
+% radii = 5:5:20;
+% opts = struct();
+% opts.sigma = 2.5;              % pre-smoothing
+% opts.spacing = [2 2 2];      % voxel size
+% opts.useabsolute = 1;        % sort eigenvalues by magnitude
+% opts.responsetype = 5;       % vesselness
+% opts.normalizationtype = 1;  % normalization
+% 
+% dopu_OOF = oof3response(dopu_flattened, radii, opts);
+% 
+% figure; imshow(imadjust(mat2gray(dopu_OOF(:,51:end-50,200))));
+% figure; imshow(imadjust(mat2gray(squeeze(mean(dopu_OOF(:,51:end-50,51:end-50))))))
+
 
 % Small vessel setting
 radii = 1:3:13;
@@ -68,6 +112,10 @@ toc
 figure; imshow(imadjust(mat2gray(dopu_OOF2(:,51:end-50,200))));
 
 figure; imshow(imadjust(mat2gray(squeeze(mean(dopu_OOF2(:,51:end-50,51:end-50))))))
+
+figure; imshowpair(imadjust(mat2gray(oct_flattened(:,51:end-50,200))),imadjust(mat2gray(dopu_OOF2(:,51:end-50,200))))
+
+% UWFOV
 
 %% Generate binarized volume based on OOF
 
@@ -100,10 +148,12 @@ plot(1:500, segCS_flattened(51:end-50,200),'b-','LineWidth',1.5);
 
 %% Apply DOPU segmentation lines to binarized volume and set out of bounds to zero
 RPE_offset = 10;
-CS_offset = -10;
+CS_offset = -15;
 
 segRPE_cropped = segRPE_flattened(51:end-50,:);
 segCS_cropped = segCS_flattened(51:end-50,:);
+prev_upper = 1;
+prev_lower = 1;
 
 for i=1:numBscans
     for j=1:numAscans-100
@@ -113,10 +163,16 @@ for i=1:numBscans
         % Mask above upper
         bw(1:target_row + RPE_offset,j,i) = 0; 
         % Mask below lower
-        bw(lower:end,j,i) = 0;
+        if lower > upper
+            bw(lower:end,j,i) = 0;
+            prev_lower = lower;
+        else
+            lower = prev_lower;
+            bw(lower:end,j,i) = 0;
+        end
+
     end
 end
-
 %% Convert segmentation lines to 3D and imfuse
 
 segRPEvol = zeros(depth, numAscans-100, numBscans);
@@ -160,19 +216,12 @@ end
 
 for i=target_row:500
     imshow(imadjust(mat2gray(squeeze(bw(i,:,51:end-50)))))
+    title(i)
     pause()
 end
 
 % Enface projection of binarized volume after segmentation lines
 figure; imshow(flipud(imrotate(imadjust(mat2gray(squeeze(mean(bw(:,:,51:end-50))))),90)))
-
-%% Adaptive histogram equalization 
-
-enf = mat2gray(squeeze(mean(bw(:,:,51:end-50),'omitnan')));
-enf_histeq = adapthisteq(enf,'NumTiles',[20 20],'ClipLimit',0.1,'Distribution','exponential');
-
-figure;imshow(imadjust(flipud(imrotate(enf_histeq,90)))); colormap gray
-imwrite(imadjust(flipud(imrotate(enf_histeq,90))),fullfile(output_filepath,'choroid_enface.tif'));
 
 %% Undo flattening and save 
 bw_unflattened = bw;
@@ -184,6 +233,17 @@ for i=1:numBscans
     end
 end
 
+enf = mat2gray(squeeze(mean(bw_unflattened(:,:,51:end-50),'omitnan')));
+enf_histeq = adapthisteq(enf,'NumTiles',[20 20],'ClipLimit',0.1,'Distribution','exponential');
+
+figure;imshow(imadjust(flipud(imrotate(enf_histeq,90)))); colormap gray
+
+optic_disk_mask_2D = roipoly(imadjust(enf_histeq));
+for k = 1:size(bw_unflattened, 1)  % for each depth slice
+    bw_unflattened(k,:,51:end-50) = squeeze(bw_unflattened(k,:,51:end-50)).* (1-optic_disk_mask_2D);
+end
+
+
 figure; imshow(imadjust(mat2gray(averaged_oct(:,51:end-50,200))))
 figure; imshowpair(imadjust(mat2gray(averaged_oct(:,51:end-50,200))),bw_unflattened(:,:,200))
 
@@ -192,11 +252,19 @@ for i=51:numBscans-50
 end
 
 for i=51:numBscans-50
-    imshowpair(imadjust(mat2gray(averaged_dopu(:,51:end-50,i))),bw_unflattened(:,:,i))
+%     imshowpair(imadjust(mat2gray(averaged_dopu(:,51:end-50,i))),bw_unflattened(:,:,i))
     imwrite(uint8(255* imadjust(mat2gray(bw_unflattened(:,:,i)))),fullfile(output_filepath,'binarized_choroid.tif'),'WriteMode','append')
 end
 
 save(fullfile(output_filepath,'binarized_choroid'), 'bw_unflattened', '-v7.3');
+
+%% Adaptive histogram equalization 
+
+enf = mat2gray(squeeze(mean(bw_unflattened(:,:,51:end-50),'omitnan')));
+enf_histeq = adapthisteq(enf,'NumTiles',[20 20],'ClipLimit',0.1,'Distribution','exponential');
+
+figure;imshow(imadjust(flipud(imrotate(enf_histeq,90)))); colormap gray
+imwrite(imadjust(flipud(imrotate(enf_histeq,90))),fullfile(output_filepath,'choroid_enface.tif'));
 
 %% DNN vessel segmentation
 
