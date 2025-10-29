@@ -1,0 +1,23 @@
+name: vessel_unet
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pytorch
+  - torchvision
+  - torchaudio
+  - matplotlib
+  - tqdm
+  - pandas
+  - scikit-image
+  - scipy
+  - numpy
+  - pillow
+  - jupyterlab
+  - ipykernel
+  - pip
+  - pip:
+    - tensorboard
+    - optuna
