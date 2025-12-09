@@ -119,9 +119,9 @@ def run_optuna_search(n_trials=20, study_name=None):
     print("Optuna will learn which hyperparameters matter and focus on promising regions\n")
     
     study.optimize(
-        objective, 
+        objective,
         n_trials=n_trials,
-        n_jobs=8,
+        n_jobs=4,
         callbacks=[save_callback],
         show_progress_bar=True
     )
