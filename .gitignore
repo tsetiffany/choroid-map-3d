@@ -1,0 +1,6 @@
+venv_vessel/
+__pycache__/
+*.pyc
+*.out
+*.err
+optuna_study_*/

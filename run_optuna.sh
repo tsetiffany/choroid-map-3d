@@ -11,13 +11,10 @@
 #SBATCH --output=optuna_output_%j.out
 #SBATCH --error=optuna_error_%j.err
 
-module load gcc/9.4.0
-module load cuda
-
-source ~/miniconda3/etc/profile.d/conda.sh
-conda activate vessel_unet
+module load gcc/9.4.0 python/3.8.10 cuda
 
 cd $SLURM_SUBMIT_DIR
+source venv_vessel/bin/activate
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
 N_TRIALS=${1:-50}
